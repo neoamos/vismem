@@ -76,24 +76,24 @@ class Database(object):
 
     def load_image(self, imdir, scale, flip):
         #print(imdir)
-        #img = Image.open(imdir)
-        #img.load()
+        img = Image.open(imdir)
+        img.load()
         #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
         #img = img.resize(img_size)
         #if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
-        #img = np.array(img, dtype=np.float32)
+        img = np.array(img, dtype=np.float32)
         #img[:,:,0] = img[:,:,0] - 104.008
         #img[:,:,1] = img[:,:,1] - 116.669
         #img[:,:,2] = img[:,:,2] - 122.675
         #img = img[np.newaxis, :].transpose(0, 3, 1, 2)
         #plt.imshow(img[0][0], cmap='gray')
         #plt.show()
-        print(imdir)
-        img = cv2.imread(imdir).astype(float)
-        img[:,:,0] = img[:,:,0] - 104.008
-        img[:,:,1] = img[:,:,1] - 116.669
-        img[:,:,2] = img[:,:,2] - 122.675
+        #print(imdir)
+        #img = cv2.imread(imdir).astype(float)
+        #img[:,:,0] = img[:,:,0] - 104.008
+        #img[:,:,1] = img[:,:,1] - 116.669
+        #img[:,:,2] = img[:,:,2] - 122.675
         img = img[np.newaxis, :].transpose(0,3,1,2)
         return img
 
