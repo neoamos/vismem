@@ -85,13 +85,13 @@ parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=
                     help='Number of iterations to train')
 parser.add_argument('--save_step', metavar='savestep', type=int, nargs=1, default=100,
                     help='Number of iterations between saves')
-parser.add_argument('--cuda', metavar='cuda', type=bool, nargs=1, default=False,
+parser.add_argument('--cuda', metavar='cuda', type=bool, nargs=1, default=True,
                     help='True if model should be run on cuda cores')
 parser.add_argument('--DAVIS_base', metavar='DAVIS_base', type=str, nargs=1, default="data/DAVIS",
                     help='Location of DAVIS')
 parser.add_argument('--image_set', metavar='image_set', type=str, nargs=1, default="data/DAVIS/ImageSets/480p/train.txt",
                     help='Location of the list of training pairs')
-parser.add_argument('--batch_size', metavar='batch_size', type=str, nargs=1, default=1,
+parser.add_argument('--batch_size', metavar='batch_size', type=str, nargs=1, default=10,
                     help='batch size for training')
 args = parser.parse_args()
 display_step = 10
@@ -111,10 +111,12 @@ pretrained_dict = torch.load("data/models/MS_DeepLab_resnet_pretrained_COCO_init
 model_dict = deep_lab.state_dict()
 newdim = model_dict['Scale.conv1.weight'][:, 0:1, :, :]
 pretrained_dict['Scale.conv1.weight'] = torch.cat((pretrained_dict['Scale.conv1.weight'], newdim), dim=1)
+for k in pretrained_dict.keys():
+   if "layer5" in k: pretrained_dict.pop(k, None)
 pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-pretrained_dict.update(model_dict)
+model_dict.update(pretrained_dict)
 
-deep_lab.load_state_dict(pretrained_dict)
+deep_lab.load_state_dict(model_dict)
 
 if args.cuda: deep_lab.cuda()
 
@@ -125,27 +127,31 @@ weight_decay = 0.0005
 optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': base_lr },
                         {'params': get_10x_lr_params(deep_lab), 'lr': 10*base_lr} ],
                         lr = base_lr, momentum = 0.9,weight_decay = weight_decay)
+optimizer.zero_grad()
 for i in range(0, args.iters):
     overall_t = time.time()
-    sources, targets = database.get_next_masktrack(args.batch_size)
-    optimizer.zero_grad()
+    sources, targets = database.get_next_masktrack(1)
     rescale = nn.UpsamplingBilinear2d(size = ( sources.shape[2], sources.shape[3] )).cuda()
 
     sources = Variable(torch.from_numpy(sources).float())
+    if args.cuda: sources = sources.cuda()
     out = deep_lab(sources)
     loss = loss_calc(rescale(out[0]), targets, args.cuda)
     for j in range(1, len(out)):
         loss = loss + loss_calc(rescale(out[j]), targets, args.cuda)
+    loss = loss/args.batch_size
     loss.backward()
-    optimizer.step()
-    out = None
 
-    overall_t = overall_t - time.time()
+    overall_t = time.time() - overall_t
     print("{} Iter: {} Loss: {:.4f}, lr {:.7f}, time {:0.4f}".format(datetime.now(), i, loss.data[0], lr_, overall_t))
-    if i % 1000 == 0:
+
+    if i % args.batch_size == 0:
+        optimizer.step()
         lr_ = lr_poly(base_lr,float(i),float(args.iters),0.9)
-        optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': base_lr },
-                                {'params': get_10x_lr_params(deep_lab), 'lr': 10*base_lr} ],
-                                lr = base_lr, momentum = 0.9,weight_decay = weight_decay)
+        optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': lr_ },
+                                {'params': get_10x_lr_params(deep_lab), 'lr': 10*lr_} ],
+                                lr = lr_, momentum = 0.9,weight_decay = weight_decay)
+        optimizer.zero_grad()
+
     if i % args.save_step == 0:
         torch.save(deep_lab.state_dict(),'data/models/masktrack/masktrack_'+str(i)+'.pth')
