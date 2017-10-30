@@ -1,5 +1,6 @@
 from networks.deeplab_resnet import Res_Deeplab
 from networks.vismem import VisMem
+from networks.deeplab_masktrack import Deeplab_Masktrack
 from database import Database
 import argparse
 import numpy as np
@@ -18,7 +19,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 parser = argparse.ArgumentParser(description='Train the vismem network')
 parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=3,
                     help='Number of timesteps (frames) to train RNN on')
-parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/bigin2",
+parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/masktrack",
                     help='Output dir to save to')
 parser.add_argument('--cuda_vismem', metavar='cuda_vismem', type=bool, nargs=1, default=True,
                     help='True if vismem should be run on cuda cores')
@@ -31,18 +32,38 @@ parser.add_argument('--test_set', metavar='image_set', type=str, nargs=1, defaul
 args = parser.parse_args()
 
 database = Database(args.DAVIS_base, "data/DAVIS/ImageSets/480p/val.txt")
-vismem = VisMem(2048,2049,1024,7,args.cuda_vismem)
-vismem.load_state_dict(torch.load("data/models/bigmem2/vismem_29900.pth", map_location=lambda storage, loc: storage))
-if args.cuda_vismem: vismem.cuda()
+#vismem = VisMem(2048,2049,1024,7,args.cuda_vismem)
+#vismem.load_state_dict(torch.load("data/models/bigmem2/vismem_29900.pth", map_location=lambda storage, loc: storage))
+#if args.cuda_vismem: vismem.cuda()
 
-deep_lab = Res_Deeplab()
+#deep_lab = Res_Deeplab()
 #deep_lab.load_state_dict( torch.load("data/models/bigmem2/deep_lab_29900.pth"))
-deep_lab.load_state_dict( torch.load("data/models/MS_DeepLab_resnet_pretrained_COCO_init.pth"))
+#deep_lab.load_state_dict( torch.load("data/models/MS_DeepLab_resnet_pretrained_COCO_init.pth"))
+#if args.cuda_deeplab: deep_lab.cuda()
+#logsoftmax = nn.LogSoftmax()
+
+deep_lab = Deeplab_Masktrack()
+deep_lab.load_state_dict(torch.load("data/models/masktrack/masktrack_29000.pth"))
 if args.cuda_deeplab: deep_lab.cuda()
-logsoftmax = nn.LogSoftmax()
 
 while database.has_next():
     images, targets, name = database.get_test()
+    #preds = vismem_pass(images, targets[0])
+    preds = masktrack_pass(images, targets[0])
+
+    for idx, p in enumerate(preds):
+        p = p[0][1].cpu().numpy()
+        m = np.zeros(p.shape)
+        m = p.astype(np.float32)>(162.0/255.0)
+        m = m.astype(np.float32)
+        if not os.path.exists(os.path.join(args.output_dir, "mask", name)): os.makedirs(os.path.join(args.output_dir, "mask",  name))
+        if not os.path.exists(os.path.join(args.output_dir, "probability",name)): os.makedirs(os.path.join(args.output_dir, "probability", name))
+        scipy.misc.imsave(os.path.join(args.output_dir,"mask", name, "{:05d}.png".format(idx)), m)
+        scipy.misc.imsave(os.path.join(args.output_dir,"probability", name, "{:05d}.png".format(idx)), p)
+        #plt.imshow(m, cmap='gray')
+        #plt.show()
+
+def vismem_pass(images, target):
     print(len(images))
     rescale = nn.UpsamplingBilinear2d(size = ( images[0].shape[2], images[0].shape[3] ))
     print(name)
@@ -68,14 +89,9 @@ while database.has_next():
         mask_pred, h_next = vismem(appearance, mask_pred, h_next)
         preds.append(rescale(mask_pred).data)
 
-    for idx, p in enumerate(preds):
-        p = p[0][1].cpu().numpy()
-        m = np.zeros(p.shape)
-        m = p.astype(np.float32)>(162.0/255.0)
-        m = m.astype(np.float32)
-        if not os.path.exists(os.path.join(args.output_dir, "mask", name)): os.makedirs(os.path.join(args.output_dir, "mask",  name))
-        if not os.path.exists(os.path.join(args.output_dir, "probability",name)): os.makedirs(os.path.join(args.output_dir, "probability", name))
-        scipy.misc.imsave(os.path.join(args.output_dir,"mask", name, "{:05d}.png".format(idx)), m)
-        scipy.misc.imsave(os.path.join(args.output_dir,"probability", name, "{:05d}.png".format(idx)), p)
-        #plt.imshow(m, cmap='gray')
-        #plt.show()
+def masktrack_pass(images, target):
+    preds = [target]
+    for i in range(len(1, images)):
+        source = Variable(torch.cat((images[i], preds[-1]), dim=1), volatile = True)
+        preds.append(deep_lab(source))
+    return preds
