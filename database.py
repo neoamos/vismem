@@ -59,6 +59,17 @@ class Database(object):
         name = sequence[0][0].split('/')[-2]
         return images,labels,name
 
+    def get_next_masktrack(self, batch_size):
+        sources = []
+        targets = []
+        for sample in range(batch_size):
+            images, labels = self.get_next(2)
+            sources.append(np.concatenate((images[1], labels[0]), axis = 1))
+            targets.append(labels[1])
+        sources = np.concatenate(sources, axis = 0)
+        targets = np.concatenate(targets, axis = 0)
+        return (sources, targets)
+
     def get_next(self, seq_num):
 
         scale = self.data_aug_scales[random.randint(0, len(self.data_aug_scales)-1)]
