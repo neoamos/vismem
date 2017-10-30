@@ -38,8 +38,9 @@ class Database(object):
         self.data_aug_scales = [0.5, 0.8, 1]
         self.DAVIS_base = DAVIS_base
         self.sequences = sequences
-        random.shuffle(self.sequences)
+        #random.shuffle(self.sequences)
         self.cur_seq = 0
+        #print(self.sequences)
 
     def has_next(self):
         if self.cur_seq >= len(self.sequences):
@@ -52,7 +53,7 @@ class Database(object):
         self.cur_seq = self.cur_seq + 1
         images = []
         labels = []
-        for i in range(0, len(sequence)-1):
+        for i in range(0, len(sequence)):
             images.append(self.load_image(os.path.join(self.DAVIS_base, sequence[i][0][1:]), 1, 0))
             labels.append(self.load_mask(os.path.join(self.DAVIS_base, sequence[i][1][1:]), 1, 0))
         name = sequence[0][0].split('/')[-2]
@@ -76,13 +77,13 @@ class Database(object):
 
     def load_image(self, imdir, scale, flip):
         #print(imdir)
-        img = Image.open(imdir)
-        img.load()
+        #img = Image.open(imdir)
+        #img.load()
         #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
         #img = img.resize(img_size)
         #if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
-        img = np.array(img, dtype=np.float32)
+        #img = np.array(img, dtype=np.float32)
         #img[:,:,0] = img[:,:,0] - 104.008
         #img[:,:,1] = img[:,:,1] - 116.669
         #img[:,:,2] = img[:,:,2] - 122.675
@@ -90,10 +91,10 @@ class Database(object):
         #plt.imshow(img[0][0], cmap='gray')
         #plt.show()
         #print(imdir)
-        #img = cv2.imread(imdir).astype(float)
-        #img[:,:,0] = img[:,:,0] - 104.008
-        #img[:,:,1] = img[:,:,1] - 116.669
-        #img[:,:,2] = img[:,:,2] - 122.675
+        img = cv2.imread(imdir).astype(float)
+        img[:,:,0] = img[:,:,0] - 104.008
+        img[:,:,1] = img[:,:,1] - 116.669
+        img[:,:,2] = img[:,:,2] - 122.675
         img = img[np.newaxis, :].transpose(0,3,1,2)
         return img
 
