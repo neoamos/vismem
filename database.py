@@ -90,10 +90,6 @@ class Database(object):
                 coords = (random.randint(0, shape[2]-crop), random.randint(0, shape[3]-crop))
                 images[-1] = images[-1][:, :, coords[0]:coords[0]+crop, coords[1]:coords[1]+crop]
                 labels[-1] = labels[-1][:, :, coords[0]:coords[0]+crop, coords[1]:coords[1]+crop]
-                plt.imshow(images[-1][0][0], cmap='gray')
-                plt.show()
-                plt.imshow(labels[-1][0][0], cmap='gray')
-                plt.show()
 
 
         return images, labels
