@@ -37,7 +37,7 @@ class Database(object):
 
         self.data_aug_scales = [0.5, 0.8, 1]
         self.DAVIS_base = DAVIS_base
-        self.sequences = sequences
+        self.sequences = sequences[0:1][0:1]
         #random.shuffle(self.sequences)
         self.cur_seq = 0
         #print(self.sequences)
@@ -73,7 +73,7 @@ class Database(object):
     def get_next(self, seq_num, flip_on=False, crop=0):
 
         scale = self.data_aug_scales[random.randint(0, len(self.data_aug_scales)-1)]
-        if flip_on: 
+        if flip_on:
              flip = random.randint(0,1)
         else: flip = 0
         seq = random.randint(0, len(self.sequences)-1)
@@ -101,21 +101,23 @@ class Database(object):
         img.load()
         #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
         #img = img.resize(img_size)
-        if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        #if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
         img = np.array(img, dtype=np.float32)
         #img[:,:,0] = img[:,:,0] - 104.008
         #img[:,:,1] = img[:,:,1] - 116.669
         #img[:,:,2] = img[:,:,2] - 122.675
         #img = img[np.newaxis, :].transpose(0, 3, 1, 2)
-        #plt.imshow(img[0][0], cmap='gray')
-        #plt.show()
         #print(imdir)
-        #img = cv2.imread(imdir).astype(float)
+        img = cv2.imread(imdir).astype(float)
+        if flip == 1: img = np.flip(img, 1)
+        plt.imshow(img)
+        plt.show()
         img[:,:,0] = img[:,:,0] - 104.008
         img[:,:,1] = img[:,:,1] - 116.669
         img[:,:,2] = img[:,:,2] - 122.675
         img = img[np.newaxis, :].transpose(0,3,1,2)
+
         return img
 
     def load_mask(self, maskdir, scale, flip):
@@ -124,12 +126,11 @@ class Database(object):
         #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
         #img = img.resize(img_size)
         if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
-
         img = img.split()[0]
         img = np.array(img, dtype=np.uint8)
         img = img[np.newaxis, :]
         img = img[np.newaxis, :]
         img[img == 255] = 1
-        #plt.imshow(img[0][0], cmap='gray')
-        #plt.show()
+        plt.imshow(img[0][0])
+        plt.show()
         return img
