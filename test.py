@@ -40,28 +40,12 @@ database = Database(args.DAVIS_base, "data/DAVIS/ImageSets/480p/val.txt")
 #deep_lab.load_state_dict( torch.load("data/models/bigmem2/deep_lab_29900.pth"))
 #deep_lab.load_state_dict( torch.load("data/models/MS_DeepLab_resnet_pretrained_COCO_init.pth"))
 #if args.cuda_deeplab: deep_lab.cuda()
-#logsoftmax = nn.LogSoftmax()
+logsoftmax = nn.LogSoftmax()
 
 deep_lab = Deeplab_Masktrack()
-deep_lab.load_state_dict(torch.load("data/models/masktrack/masktrack_29000.pth"))
+deep_lab.load_state_dict(torch.load("data/models/masktrack/masktrack_19000.pth"))
 if args.cuda_deeplab: deep_lab.cuda()
 
-while database.has_next():
-    images, targets, name = database.get_test()
-    #preds = vismem_pass(images, targets[0])
-    preds = masktrack_pass(images, targets[0])
-
-    for idx, p in enumerate(preds):
-        p = p[0][1].cpu().numpy()
-        m = np.zeros(p.shape)
-        m = p.astype(np.float32)>(162.0/255.0)
-        m = m.astype(np.float32)
-        if not os.path.exists(os.path.join(args.output_dir, "mask", name)): os.makedirs(os.path.join(args.output_dir, "mask",  name))
-        if not os.path.exists(os.path.join(args.output_dir, "probability",name)): os.makedirs(os.path.join(args.output_dir, "probability", name))
-        scipy.misc.imsave(os.path.join(args.output_dir,"mask", name, "{:05d}.png".format(idx)), m)
-        scipy.misc.imsave(os.path.join(args.output_dir,"probability", name, "{:05d}.png".format(idx)), p)
-        #plt.imshow(m, cmap='gray')
-        #plt.show()
 
 def vismem_pass(images, target):
     print(len(images))
@@ -90,8 +74,35 @@ def vismem_pass(images, target):
         preds.append(rescale(mask_pred).data)
 
 def masktrack_pass(images, target):
+    rescale = nn.UpsamplingBilinear2d(size = ( images[0].shape[2], images[0].shape[3] ))
+    target = torch.from_numpy(target).float().cuda()
     preds = [target]
-    for i in range(len(1, images)):
-        source = Variable(torch.cat((images[i], preds[-1]), dim=1), volatile = True)
-        preds.append(deep_lab(source))
+    for i in range(1, len(images)):
+        image = torch.from_numpy(images[i]).float().cuda()
+#        print(image.size())
+#        print(type(image))
+#        print(type(preds[-1]))
+#        print(preds[-1].size())
+        source = Variable( torch.cat((image,preds[-1]), dim=1) , volatile = True ).cuda()
+        mask_pred = deep_lab(source)[3].data[0][None, :, :, :]
+        mask_pred = (math.e**logsoftmax(Variable(mask_pred, requires_grad=False)))[:, 1:2, :, :]
+        preds.append(rescale(mask_pred).data[0][None, :, :, :])
     return preds
+
+while database.has_next():
+    images, targets, name = database.get_test()
+    print(name)
+    #preds = vismem_pass(images, targets[0])
+    preds = masktrack_pass(images, targets[0])
+
+    for idx, p in enumerate(preds):
+        p = p[0][0].cpu().numpy()
+        m = np.zeros(p.shape)
+        m = p.astype(np.float32)>(162.0/255.0)
+        m = m.astype(np.float32)
+        if not os.path.exists(os.path.join(args.output_dir, "mask", name)): os.makedirs(os.path.join(args.output_dir, "mask",  name))
+        if not os.path.exists(os.path.join(args.output_dir, "probability",name)): os.makedirs(os.path.join(args.output_dir, "probability", name))
+        scipy.misc.imsave(os.path.join(args.output_dir,"mask", name, "{:05d}.png".format(idx)), m)
+        scipy.misc.imsave(os.path.join(args.output_dir,"probability", name, "{:05d}.png".format(idx)), p)
+        #plt.imshow(m, cmap='gray')
+        #plt.show()
