@@ -19,7 +19,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 parser = argparse.ArgumentParser(description='Train the vismem network')
 parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=3,
                     help='Number of timesteps (frames) to train RNN on')
-parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/masktrack",
+parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/masktrack_normin",
                     help='Output dir to save to')
 parser.add_argument('--cuda_vismem', metavar='cuda_vismem', type=bool, nargs=1, default=True,
                     help='True if vismem should be run on cuda cores')
@@ -43,7 +43,7 @@ database = Database(args.DAVIS_base, "data/DAVIS/ImageSets/480p/val.txt")
 logsoftmax = nn.LogSoftmax()
 
 deep_lab = Deeplab_Masktrack()
-deep_lab.load_state_dict(torch.load("data/models/masktrack/masktrack_19000.pth"))
+deep_lab.load_state_dict(torch.load("data/models/masktrack_normin/masktrack_29000.pth"))
 if args.cuda_deeplab: deep_lab.cuda()
 
 
@@ -84,7 +84,7 @@ def masktrack_pass(images, target):
 #        print(type(preds[-1]))
 #        print(preds[-1].size())
         source = Variable( torch.cat((image,preds[-1]), dim=1) , volatile = True ).cuda()
-        mask_pred = deep_lab(source)[3].data[0][None, :, :, :]
+        mask_pred = deep_lab(source)[0].data[0][None, :, :, :]
         mask_pred = (math.e**logsoftmax(Variable(mask_pred, requires_grad=False)))[:, 1:2, :, :]
         preds.append(rescale(mask_pred).data[0][None, :, :, :])
     return preds

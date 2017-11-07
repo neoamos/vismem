@@ -37,7 +37,7 @@ class Database(object):
 
         self.data_aug_scales = [0.5, 0.8, 1]
         self.DAVIS_base = DAVIS_base
-        self.sequences = sequences[0:1][0:1]
+        self.sequences = sequences
         #random.shuffle(self.sequences)
         self.cur_seq = 0
         #print(self.sequences)
@@ -63,7 +63,7 @@ class Database(object):
         sources = []
         targets = []
         for sample in range(batch_size):
-            images, labels = self.get_next(2, flip_on=True, crop=321)
+            images, labels = self.get_next(2, flip_on=True)
             sources.append(np.concatenate((images[1], labels[0]), axis = 1))
             targets.append(labels[1])
         sources = np.concatenate(sources, axis = 0)
@@ -97,13 +97,13 @@ class Database(object):
 
     def load_image(self, imdir, scale, flip):
         #print(imdir)
-        img = Image.open(imdir)
-        img.load()
+        #img = Image.open(imdir)
+        #img.load()
         #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
         #img = img.resize(img_size)
         #if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
-        img = np.array(img, dtype=np.float32)
+        #img = np.array(img, dtype=np.float32)
         #img[:,:,0] = img[:,:,0] - 104.008
         #img[:,:,1] = img[:,:,1] - 116.669
         #img[:,:,2] = img[:,:,2] - 122.675
@@ -111,8 +111,8 @@ class Database(object):
         #print(imdir)
         img = cv2.imread(imdir).astype(float)
         if flip == 1: img = np.flip(img, 1)
-        plt.imshow(img)
-        plt.show()
+        #plt.imshow(img)
+        #plt.show()
         img[:,:,0] = img[:,:,0] - 104.008
         img[:,:,1] = img[:,:,1] - 116.669
         img[:,:,2] = img[:,:,2] - 122.675
@@ -127,10 +127,11 @@ class Database(object):
         #img = img.resize(img_size)
         if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img = img.split()[0]
-        img = np.array(img, dtype=np.uint8)
+        img = np.array(img, dtype=np.int16)
         img = img[np.newaxis, :]
         img = img[np.newaxis, :]
-        img[img == 255] = 1
-        plt.imshow(img[0][0])
-        plt.show()
+        #img[img == 255] = 1
+        img = img-127.5
+        #plt.imshow(img[0][0])
+        #plt.show()
         return img

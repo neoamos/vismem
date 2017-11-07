@@ -25,10 +25,11 @@ class VisMem(nn.Module):
     def forward(self,appearance,mask,hidden):
         self.rescale = nn.UpsamplingBilinear2d(size = (appearance.size()[2], appearance.size()[3] ))
         mask = self.rescale(mask)
-        input = f.tanh(self.Input_reduction_1(appearance))
-        input = f.tanh(self.Input_reduction_2(input))
-        input = f.tanh(self.Input_reduction_3(input))
-        input = torch.cat([input, mask], dim=1)
+	#input = torch.cat([appearance, mask], dim=1)
+        #input = f.tanh(self.Input_reduction_1(appearance))
+        #input = f.tanh(self.Input_reduction_2(input))
+        #input = f.tanh(self.Input_reduction_3(input))
+        input = torch.cat([appearance, mask], dim=1)
         if hidden is None:
            size_h    = [input.data.size()[0],self.hidden_size] + list(input.data.size()[2:])
            if self.cuda_flag  == True:

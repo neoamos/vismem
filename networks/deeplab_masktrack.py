@@ -137,8 +137,8 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation__ = 2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation__ = 4)
-        self.layer5 = self._make_pred_layer(Classifier_Module, [6,12,18,24],[6,12,18,24],2048,128)
-        self.layer6 = self._make_pred_layer(Classifier_Module, [6,12,18,24],[6,12,18,24],128,NoLabels)
+        self.layer5 = self._make_pred_layer(Classifier_Module, [6,12,18,24],[6,12,18,24],2048,NoLabels)
+        #self.layer6 = self._make_pred_layer(Classifier_Module, [6,12,18,24],[6,12,18,24],128,NoLabels)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -179,8 +179,8 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = f.tanh(self.layer5(x))
-        x = self.layer6(x)
+        #x = f.tanh(self.layer5(x))
+        x = self.layer5(x)
 
         return x
 
