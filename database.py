@@ -22,20 +22,7 @@ class Database(object):
                 seq_num = seq_num+1
                 sequences[seq_num].append(p)
 
-        '''
-        seq_names = sorted(os.listdir(image_dir))
-        images = []
-        annotations = []
-        for seq_name in seq_names:
-            frames = sorted(os.listdir(os.path.join(image_dir, seq_name)))
-            frames = map(lambda x: os.path.join(image_dir, seq_name, x), frames)
-            images.append(frames)
-            masks = sorted(os.listdir(os.path.join(annotation_dir, seq_name)))
-            masks = map(lambda x: os.path.join(annotation_dir, seq_name, x), masks)
-            annotations.append(masks)
-        '''
-
-        self.data_aug_scales = [0.5, 0.8, 1]
+        self.data_aug_scales = [0.5, 0.5, 1, 1.25, 1.5]
         self.DAVIS_base = DAVIS_base
         self.sequences = sequences
         #random.shuffle(self.sequences)
@@ -62,17 +49,17 @@ class Database(object):
     def get_next_masktrack(self, batch_size):
         sources = []
         targets = []
+        scale = self.data_aug_scales[random.randint(0, len(self.data_aug_scales)-1)]
         for sample in range(batch_size):
-            images, labels = self.get_next(2, flip_on=True, crop=321)
+            images, labels = self.get_next(2, flip_on=True, crop=321, scale=scale)
             sources.append(np.concatenate((images[1], labels[0]), axis = 1))
             targets.append(labels[1])
         sources = np.concatenate(sources, axis = 0)
         targets = np.concatenate(targets, axis = 0)
         return (sources, targets)
 
-    def get_next(self, seq_num, flip_on=False, crop=0, scale=1):
+    def get_next(self, seq_num, flip_on=False, crop=321, scale=1):
 
-        scale = self.data_aug_scales[random.randint(0, len(self.data_aug_scales)-1)]
         if flip_on:
              flip = random.randint(0,1)
         else: flip = 0
@@ -82,14 +69,21 @@ class Database(object):
 
         num = len(self.sequences[seq])-1
         subseq = random.randint(0, num-seq_num)
+        offset = (random.random(), random.random())
         for i in range(subseq, subseq+seq_num):
             images.append(self.load_image(os.path.join(self.DAVIS_base, self.sequences[seq][i][0][1:]), scale, flip))
             labels.append(self.load_mask(os.path.join(self.DAVIS_base, self.sequences[seq][i][1][1:]), scale, flip))
             if crop:
                 shape = images[-1].shape
-                coords = (random.randint(0, shape[2]-crop), random.randint(0, shape[3]-crop))
+                coords = ( int(offset[0]*(shape[2]-crop)) if crop<shape[2] else 0,
+                           int(offset[0]*(shape[3]-crop)) if crop<shape[3] else  0)
                 images[-1] = images[-1][:, :, coords[0]:coords[0]+crop, coords[1]:coords[1]+crop]
                 labels[-1] = labels[-1][:, :, coords[0]:coords[0]+crop, coords[1]:coords[1]+crop]
+
+                plt.imshow(images[-1][0].transpose(1,2,0))
+                plt.show()
+                plt.imshow(labels[-1][0][0]+127.5)
+                plt.show()
 
 
         return images, labels
@@ -104,26 +98,30 @@ class Database(object):
         if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
         img = np.array(img, dtype=np.float32)
-        img[:,:,0] = img[:,:,0] - 104.008
-        img[:,:,1] = img[:,:,1] - 116.669
-        img[:,:,2] = img[:,:,2] - 122.675
-        img = img[np.newaxis, :].transpose(0, 3, 1, 2)
-        #print(imdir)
-        #img = cv2.imread(imdir).astype(float)
-        #if flip == 1: img = np.flip(img, 1)
-        #plt.imshow(img)
+        img = np.flip(img, 2)
+        #plt.imshow(img/255)
         #plt.show()
         #img[:,:,0] = img[:,:,0] - 104.008
         #img[:,:,1] = img[:,:,1] - 116.669
         #img[:,:,2] = img[:,:,2] - 122.675
+        img = img[np.newaxis, :].transpose(0, 3, 1, 2)
+        #print(imdir)
+        #img = cv2.imread(imdir).astype(float)
+        #if flip == 1: img = np.flip(img, 1)
+        #img[:,:,0] = img[:,:,0] - 104.008
+        #img[:,:,1] = img[:,:,1] - 116.669
+        #img[:,:,2] = img[:,:,2] - 122.675
+
         #img = img[np.newaxis, :].transpose(0,3,1,2)
+
+
 
         return img
 
     def load_mask(self, maskdir, scale, flip):
         img = Image.open(maskdir)
         img.load()
-        #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
+        img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
         img = img.resize(img_size)
         if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img = img.split()[0]

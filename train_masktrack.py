@@ -29,9 +29,9 @@ def loss_calc(out, label, cuda):
     label = label+127.5
     label[label==255] = 1
     label = torch.from_numpy(label).float()[:, 0, :, :]
-    label = Variable(label).long()
-    #label = rescale(label).data[:, 0, :, :]
-    #label = Variable(label.long())
+    #label = Variable(label).long()
+    label = rescale(label).data[:, 0, :, :]
+    label = Variable(label.long())
     if cuda: label = label.cuda()
     if cuda: out  = out.cuda()
     m = nn.LogSoftmax()
@@ -85,9 +85,9 @@ def lr_poly(base_lr, iter,max_iter,power):
     return base_lr*((1-float(iter)/max_iter)**(power))
 
 parser = argparse.ArgumentParser(description='Train the vismem network')
-parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=30000,
+parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=35000,
                     help='Number of iterations to train')
-parser.add_argument('--save_step', metavar='savestep', type=int, nargs=1, default=1000,
+parser.add_argument('--save_step', metavar='savestep', type=int, nargs=1, default=5000,
                     help='Number of iterations between saves')
 parser.add_argument('--cuda', metavar='cuda', type=bool, nargs=1, default=True,
                     help='True if model should be run on cuda cores')
@@ -126,7 +126,7 @@ deep_lab.load_state_dict(model_dict)
 if args.cuda: deep_lab.cuda()
 
 database = Database(args.DAVIS_base, args.image_set)
-base_lr = 1e-3
+base_lr = 2.5e-4
 lr_ = base_lr
 weight_decay = 0.0005
 optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': base_lr },
@@ -134,7 +134,7 @@ optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': base
                         lr = base_lr, momentum = 0.9,weight_decay = weight_decay)
 optimizer.zero_grad()
 last_ten = []
-for i in range(0, args.iters):
+for i in range(0, args.iters+1):
     overall_t = time.time()
     sources, targets = database.get_next_masktrack(args.batch_size)
     rescale = nn.UpsamplingBilinear2d(size = ( sources.shape[2], sources.shape[3])).cuda()
@@ -144,9 +144,9 @@ for i in range(0, args.iters):
     sources = rescale2(sources)
     if args.cuda: sources = sources.cuda()
     out = deep_lab(sources)
-    loss = loss_calc(rescale(out[0]), targets, args.cuda)
+    loss = loss_calc(out[0], targets, args.cuda)
     for j in range(1, len(out)):
-        loss = loss + loss_calc(rescale(out[j]), targets, args.cuda)
+        loss = loss + loss_calc(out[j], targets, args.cuda)
     loss = loss/args.batch_size
     loss.backward()
     overall_t = time.time() - overall_t
@@ -164,4 +164,4 @@ for i in range(0, args.iters):
        optimizer.zero_grad()
 
     if i % args.save_step == 0:
-        torch.save(deep_lab.state_dict(),'data/models/masktrack_invalgoodbatch/masktrack_'+str(i)+'.pth')
+        torch.save(deep_lab.state_dict(),'data/models/masktrack_v2/masktrack_'+str(i)+'.pth')
