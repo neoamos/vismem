@@ -63,14 +63,14 @@ class Database(object):
         sources = []
         targets = []
         for sample in range(batch_size):
-            images, labels = self.get_next(2, flip_on=True)
+            images, labels = self.get_next(2, flip_on=True, crop=321)
             sources.append(np.concatenate((images[1], labels[0]), axis = 1))
             targets.append(labels[1])
         sources = np.concatenate(sources, axis = 0)
         targets = np.concatenate(targets, axis = 0)
         return (sources, targets)
 
-    def get_next(self, seq_num, flip_on=False, crop=0):
+    def get_next(self, seq_num, flip_on=False, crop=0, scale=1):
 
         scale = self.data_aug_scales[random.randint(0, len(self.data_aug_scales)-1)]
         if flip_on:
@@ -97,26 +97,26 @@ class Database(object):
 
     def load_image(self, imdir, scale, flip):
         #print(imdir)
-        #img = Image.open(imdir)
-        #img.load()
-        #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
-        #img = img.resize(img_size)
-        #if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        img = Image.open(imdir)
+        img.load()
+        img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
+        img = img.resize(img_size)
+        if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
-        #img = np.array(img, dtype=np.float32)
-        #img[:,:,0] = img[:,:,0] - 104.008
-        #img[:,:,1] = img[:,:,1] - 116.669
-        #img[:,:,2] = img[:,:,2] - 122.675
-        #img = img[np.newaxis, :].transpose(0, 3, 1, 2)
-        #print(imdir)
-        img = cv2.imread(imdir).astype(float)
-        if flip == 1: img = np.flip(img, 1)
-        #plt.imshow(img)
-        #plt.show()
+        img = np.array(img, dtype=np.float32)
         img[:,:,0] = img[:,:,0] - 104.008
         img[:,:,1] = img[:,:,1] - 116.669
         img[:,:,2] = img[:,:,2] - 122.675
-        img = img[np.newaxis, :].transpose(0,3,1,2)
+        img = img[np.newaxis, :].transpose(0, 3, 1, 2)
+        #print(imdir)
+        #img = cv2.imread(imdir).astype(float)
+        #if flip == 1: img = np.flip(img, 1)
+        #plt.imshow(img)
+        #plt.show()
+        #img[:,:,0] = img[:,:,0] - 104.008
+        #img[:,:,1] = img[:,:,1] - 116.669
+        #img[:,:,2] = img[:,:,2] - 122.675
+        #img = img[np.newaxis, :].transpose(0,3,1,2)
 
         return img
 
@@ -124,7 +124,7 @@ class Database(object):
         img = Image.open(maskdir)
         img.load()
         #img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
-        #img = img.resize(img_size)
+        img = img.resize(img_size)
         if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img = img.split()[0]
         img = np.array(img, dtype=np.int16)
