@@ -42,7 +42,7 @@ def lr_poly(base_lr, iter,max_iter,power):
     return base_lr*((1-float(iter)/max_iter)**(power))
 
 parser = argparse.ArgumentParser(description='Train the vismem network')
-parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=14,
+parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=1,
                     help='Number of timesteps (frames) to train RNN on')
 parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=30000,
                     help='Number of iterations to train')
@@ -78,6 +78,8 @@ base_lr = 1e-4
 optimizer = optim.RMSprop(vismem.parameters(), lr=1e-4, weight_decay=0.005)
 logsoftmax = nn.LogSoftmax()
 for i in range(0, args.iters+1):
+    if i>15000:
+        args.timesteps=14
     overall = time.time()
     data_read = time.time()
     images, targets = database.get_next(args.timesteps+1)
@@ -92,9 +94,17 @@ for i in range(0, args.iters+1):
     loss_tt = 0
     cuda_tt = 0
 
-    for s in range(args.timesteps):
-        image = Variable(torch.Tensor.pin_memory(torch.from_numpy(images[s]).float()), volatile=True)
-        mask = Variable(torch.Tensor.pin_memory(torch.from_numpy(targets[s]).float()))
+    mask_pred = torch.from_numpy(targets[0])
+    h_next = None
+    for s in range(1, args.timesteps):
+
+        if s >1:
+            mask_pred = ((math.e**logsoftmax(mask_pred))[:, 1:2, :, :]-0.5)*255
+            mask_pred = rescale(mask_pred).data[0]
+
+        image = torch.cat((torch.from_numpy(images[s]), mask_pred), dim=1)
+        image = Variable(image, volatile=True).float()
+        mask = Variable(torch.from_numpy(targets[s]).float())
 
         cuda_t = time.time()
         if args.cuda_deeplab: image = image.cuda()
@@ -107,31 +117,16 @@ for i in range(0, args.iters+1):
         appearance = Variable(appearance.data)
         appearance = appearance.cuda()
         appearance_t = time.time()-appearance_t
-        #appearance.volatile = False
-        #appearance.requires_grad = True
-        #print([(a[0][0],a[0][1].cpu()-a[1][1].cpu()) for a in zip(b4.items(), l8r.items())])
-        #if args.cuda_vismem:
 
-        if s == 0:
-            h_next = None
-            mask_pred = mask
-            mask_prev = mask
-        else:
-            #if random.random() < 0.2:
-            #    mask_pred = mask_prev
-            #else:
-            mask_pred = (math.e**logsoftmax(mask_pred))[:, 1:2, :, :]
-            #mask_prev = mask
-            #mask_pred = mask_pred[:, 1:2, :, :]
         vism = time.time()
         mask_pred, h_next = vismem(appearance, mask_pred, h_next)
         vism = time.time()-vism
 
         loss_t = time.time()
         if s == 0:
-            loss = loss_calc(rescale(mask_pred), targets[s], args.cuda_vismem)
+            loss = loss_calc(mask_pred, targets[s], args.cuda_vismem)
         else:
-            loss = loss + loss_calc(rescale(mask_pred), targets[s], args.cuda_vismem)
+            loss = loss + loss_calc(mask_pred, targets[s], args.cuda_vismem)
         loss_t = time.time()-loss_t
         appearance_tt = appearance_tt + appearance_t
         vism_t = vism_t + vism
@@ -145,10 +140,13 @@ for i in range(0, args.iters+1):
     rest = overall - appearance_tt - vism_t - loss_tt - data_read - opt_zero - cuda_t
     print("{} Iter: {} Loss: {:.4f}, lr {:.4f}, overall {:.4f}, appearance {:.4f}, vism {:.4f}, loss {:.4f}, opt_zero {:.4f}, data load {:.4f}, rest {:.4f}, cuda {:.4f}".format(datetime.now(), i, loss.data[0], lr_, overall, appearance_tt,
                                         vism_t, loss_tt, opt_zero, data_read, rest, cuda_tt ))
+    loss = loss/args.timesteps
     loss.backward()
     optimizer.step()
     if i % 1000 == 0:
-       optimizer = optim.RMSprop(vismem.parameters(), lr=lr_, weight_decay=0.005)
+        param_groups = optimizer.param_groups
+        param_groups[0]['lr'] = lr_
+        #optimizer = optim.RMSprop(vismem.parameters(), lr=lr_, weight_decay=0.005)
 
     if i % display_step == 0:
         pass
@@ -156,7 +154,4 @@ for i in range(0, args.iters+1):
         #    plt.imshow(p[0][1].cpu().numpy(), cmap='gray')
         #    plt.show()
     if i % args.save_step == 0:
-        torch.save(vismem.state_dict(),'data/models/bigmem2/vismem_'+str(i)+'.pth')
-        torch.save(deep_lab.state_dict(),'data/models/bigmem2/deep_lab_'+str(i)+'.pth')
-
-    #print([(a[0][0],a[1][0]) for a in zip(b4.items(), l8r.items())])
+        torch.save(vismem.state_dict(),'data/models/mtv/vismem_'+str(i)+'.pth')
