@@ -18,18 +18,18 @@ class VisMem(nn.Module):
         self.Conv_ct         = nn.Conv2d(self.gru_input_size + self.hidden_size,self.hidden_size,3,padding=self.kernel_size//2-2)
         self.Input_reduction_1 = nn.Conv2d(self.input_size, 1024, 1)
         self.Input_reduction_2 = nn.Conv2d(1024, 512, 1)
-        self.Input_reduction_3 = nn.Conv2d(512, gru_input_size-1, 1)
+        self.Input_reduction_3 = nn.Conv2d(512, gru_input_size, 1)
         self.Mask_reduction  = nn.Conv2d(self.hidden_size, 2, 1)
         dtype                = torch.FloatTensor
 
     def forward(self,appearance,mask,hidden):
-        self.rescale = nn.UpsamplingBilinear2d(size = (appearance.size()[2], appearance.size()[3] ))
-        mask = self.rescale(mask)
+        #self.rescale = nn.UpsamplingBilinear2d(size = (appearance.size()[2], appearance.size()[3] ))
+        #mask = self.rescale(mask)
         #input = torch.cat([appearance, mask], dim=1)
-        #input = f.tanh(self.Input_reduction_1(appearance))
-        #input = f.tanh(self.Input_reduction_2(input))
-        #input = f.tanh(self.Input_reduction_3(input))
-        input = torch.cat([appearance, mask], dim=1)
+        input = f.tanh(self.Input_reduction_1(appearance))
+        input = f.tanh(self.Input_reduction_2(input))
+        input = f.tanh(self.Input_reduction_3(input))
+        #input = torch.cat([appearance, mask], dim=1)
         if hidden is None:
            size_h    = [input.data.size()[0],self.hidden_size] + list(input.data.size()[2:])
            if self.cuda_flag  == True:

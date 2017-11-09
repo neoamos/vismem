@@ -58,7 +58,7 @@ class Database(object):
         targets = np.concatenate(targets, axis = 0)
         return (sources, targets)
 
-    def get_next(self, seq_num, flip_on=False, crop=0, scale=1):
+    def get_next(self, seq_num, flip_on=True, crop=0, scale=1):
 
         if flip_on:
              flip = random.randint(0,1)
