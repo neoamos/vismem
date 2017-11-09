@@ -89,7 +89,7 @@ parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=
                     help='Number of iterations to train')
 parser.add_argument('--save_step', metavar='savestep', type=int, nargs=1, default=5000,
                     help='Number of iterations between saves')
-parser.add_argument('--cuda', metavar='cuda', type=bool, nargs=1, default=True,
+parser.add_argument('--cuda', metavar='cuda', type=bool, nargs=1, default=False,
                     help='True if model should be run on cuda cores')
 parser.add_argument('--DAVIS_base', metavar='DAVIS_base', type=str, nargs=1, default="data/DAVIS",
                     help='Location of DAVIS')

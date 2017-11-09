@@ -77,7 +77,7 @@ database = Database(args.DAVIS_base, args.image_set)
 base_lr = 1e-4
 optimizer = optim.RMSprop(vismem.parameters(), lr=1e-4, weight_decay=0.005)
 logsoftmax = nn.LogSoftmax()
-for i in range(4101, args.iters):
+for i in range(0, args.iters+1):
     overall = time.time()
     data_read = time.time()
     images, targets = database.get_next(args.timesteps+1)
