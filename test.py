@@ -15,11 +15,11 @@ from torch.autograd import Variable
 from PIL import Image
 import matplotlib.pyplot as plt
 import scipy.misc
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 parser = argparse.ArgumentParser(description='Train the vismem network')
 parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=3,
                     help='Number of timesteps (frames) to train RNN on')
-parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/masktrack_invalgood",
+parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/masktrack_v22",
                     help='Output dir to save to')
 parser.add_argument('--cuda_vismem', metavar='cuda_vismem', type=bool, nargs=1, default=True,
                     help='True if vismem should be run on cuda cores')
@@ -43,7 +43,7 @@ database = Database(args.DAVIS_base, "data/DAVIS/ImageSets/480p/val.txt")
 logsoftmax = nn.LogSoftmax()
 
 deep_lab = Deeplab_Masktrack()
-deep_lab.load_state_dict(torch.load("data/models/masktrack_invalgood/masktrack_59000.pth"))
+deep_lab.load_state_dict(torch.load("data/models/masktrack_v22/masktrack_30000.pth"))
 if args.cuda_deeplab: deep_lab.cuda()
 
 

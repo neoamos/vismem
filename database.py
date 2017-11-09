@@ -80,10 +80,10 @@ class Database(object):
                 images[-1] = images[-1][:, :, coords[0]:coords[0]+crop, coords[1]:coords[1]+crop]
                 labels[-1] = labels[-1][:, :, coords[0]:coords[0]+crop, coords[1]:coords[1]+crop]
 
-                plt.imshow(images[-1][0].transpose(1,2,0))
-                plt.show()
-                plt.imshow(labels[-1][0][0]+127.5)
-                plt.show()
+                # plt.imshow(images[-1][0].transpose(1,2,0))
+                # plt.show()
+                # plt.imshow(labels[-1][0][0]+127.5)
+                # plt.show()
 
 
         return images, labels
@@ -98,12 +98,12 @@ class Database(object):
         if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
         img = np.array(img, dtype=np.float32)
-        img = np.flip(img, 2)
+        img = np.flip(img, 2).copy()
         #plt.imshow(img/255)
         #plt.show()
-        #img[:,:,0] = img[:,:,0] - 104.008
-        #img[:,:,1] = img[:,:,1] - 116.669
-        #img[:,:,2] = img[:,:,2] - 122.675
+        img[:,:,0] = img[:,:,0] - 104.008
+        img[:,:,1] = img[:,:,1] - 116.669
+        img[:,:,2] = img[:,:,2] - 122.675
         img = img[np.newaxis, :].transpose(0, 3, 1, 2)
         #print(imdir)
         #img = cv2.imread(imdir).astype(float)
@@ -113,8 +113,6 @@ class Database(object):
         #img[:,:,2] = img[:,:,2] - 122.675
 
         #img = img[np.newaxis, :].transpose(0,3,1,2)
-
-
 
         return img
 

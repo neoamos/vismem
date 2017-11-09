@@ -28,8 +28,8 @@ def loss_calc(out, label, cuda):
 
     label = label+127.5
     label[label==255] = 1
-    label = torch.from_numpy(label).float()[:, 0, :, :]
-    #label = Variable(label).long()
+    label = torch.from_numpy(label).float()
+    label = Variable(label)
     label = rescale(label).data[:, 0, :, :]
     label = Variable(label.long())
     if cuda: label = label.cuda()
@@ -121,12 +121,12 @@ for k in pretrained_dict.keys():
 pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
 model_dict.update(pretrained_dict)
 
-deep_lab.load_state_dict(model_dict)
+deep_lab.load_state_dict(torch.load("data/models/masktrack_v22/masktrack_15000.pth"))
 
 if args.cuda: deep_lab.cuda()
 
 database = Database(args.DAVIS_base, args.image_set)
-base_lr = 2.5e-4
+base_lr = 1e-3
 lr_ = base_lr
 weight_decay = 0.0005
 optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': base_lr },
@@ -134,7 +134,7 @@ optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': base
                         lr = base_lr, momentum = 0.9,weight_decay = weight_decay)
 optimizer.zero_grad()
 last_ten = []
-for i in range(0, args.iters+1):
+for i in range(15010, args.iters+1):
     overall_t = time.time()
     sources, targets = database.get_next_masktrack(args.batch_size)
     rescale = nn.UpsamplingBilinear2d(size = ( sources.shape[2], sources.shape[3])).cuda()
@@ -164,4 +164,4 @@ for i in range(0, args.iters+1):
        optimizer.zero_grad()
 
     if i % args.save_step == 0:
-        torch.save(deep_lab.state_dict(),'data/models/masktrack_v2/masktrack_'+str(i)+'.pth')
+        torch.save(deep_lab.state_dict(),'data/models/masktrack_v22/masktrack_'+str(i)+'.pth')
