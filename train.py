@@ -1,4 +1,4 @@
-from networks.deeplab_resnet import Res_Deeplab
+from networks.deeplab_masktrack import Deeplab_Masktrack
 from networks.vismem import VisMem
 from database import Database
 from datetime import datetime
@@ -25,7 +25,8 @@ def loss_calc(out, label, cuda):
     """
     # out shape batch_size x channels x h x w -> batch_size x channels x h x w
     # label shape batch_size x 1 x h x w  -> batch_size x h x w
-    label = label
+    label = label+127.5
+    label[label==255] = 1
     label = torch.from_numpy(label).long()
     label = label[:, 0, :, :]
     label = Variable(label)
@@ -34,7 +35,6 @@ def loss_calc(out, label, cuda):
     m = nn.LogSoftmax().cuda()
     criterion = nn.NLLLoss2d().cuda()
     #criterion = nn.BCELoss()
-
     out = m(out)
     return criterion(out,label)
 
@@ -42,7 +42,7 @@ def lr_poly(base_lr, iter,max_iter,power):
     return base_lr*((1-float(iter)/max_iter)**(power))
 
 parser = argparse.ArgumentParser(description='Train the vismem network')
-parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=1,
+parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=2,
                     help='Number of timesteps (frames) to train RNN on')
 parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=30000,
                     help='Number of iterations to train')
@@ -61,88 +61,68 @@ display_step = 10
 gpu=3
 
 vismem = VisMem(2048,128,128,7,args.cuda_vismem)
-vismem.load_state_dict(torch.load("data/models/vismem_80.pth"))
+vismem.load_state_dict(torch.load("data/models/mtv/vismem_13000.pth"))
 
 if args.cuda_vismem: vismem.cuda()
 
-deep_lab = Res_Deeplab()
+deep_lab = Deeplab_Masktrack()
 #deep_lab.load_state_dict( torch.load("data/models/MS_DeepLab_resnet_pretrained_COCO_init.pth"))
-deep_lab.load_state_dict( torch.load("data/models/bigmem2/deep_lab_4100.pth"))
-b4 = deep_lab.state_dict()
+deep_lab.load_state_dict( torch.load("data/models/masktrack_v22/masktrack_30000.pth"))
 
 if args.cuda_deeplab: deep_lab.cuda()
-l8r = deep_lab.state_dict()
 
 database = Database(args.DAVIS_base, args.image_set)
-base_lr = 1e-4
-optimizer = optim.RMSprop(vismem.parameters(), lr=1e-4, weight_decay=0.005)
+base_lr = 1e-3
+optimizer = optim.RMSprop(vismem.parameters(), lr=base_lr, weight_decay=0.005)
 logsoftmax = nn.LogSoftmax()
-for i in range(0, args.iters+1):
-    if i>15000:
+last_ten = []
+for i in range(13001, args.iters+1):
+    if i>5000:
         args.timesteps=14
     overall = time.time()
     data_read = time.time()
     images, targets = database.get_next(args.timesteps+1)
     data_read = time.time()-data_read
-    opt_zero = time.time()
     optimizer.zero_grad()
-    opt_zero = time.time()-opt_zero
     rescale = nn.UpsamplingBilinear2d(size = ( images[0].shape[2], images[0].shape[3] )).cuda()
 
-    appearance_tt = 0
-    vism_t = 0
-    loss_tt = 0
-    cuda_tt = 0
-
-    mask_pred = torch.from_numpy(targets[0])
+    overall_t = time.time()
+    mask_pred = torch.from_numpy(targets[0]).float().cuda()
     h_next = None
     for s in range(1, args.timesteps):
+        if s>1:
+           mask_pred = ((math.e**logsoftmax(mask_pred.data))[:, 1:2, :, :]-0.5)*255
+           mask_pred = mask_pred.data
+           print(np.amin(mask_pred.cpu().numpy()))
 
-        if s >1:
-            mask_pred = ((math.e**logsoftmax(mask_pred))[:, 1:2, :, :]-0.5)*255
-            mask_pred = rescale(mask_pred).data[0]
-
-        image = torch.cat((torch.from_numpy(images[s]), mask_pred), dim=1)
+        image = torch.cat((torch.from_numpy(images[s]).cuda(), mask_pred), dim=1)
         image = Variable(image, volatile=True).float()
         mask = Variable(torch.from_numpy(targets[s]).float())
-
-        cuda_t = time.time()
         if args.cuda_deeplab: image = image.cuda()
         mask = mask.cuda()
-        cuda_t = time.time()-cuda_t
 
-
-        appearance_t = time.time()
         appearance = deep_lab(image)[3]
         appearance = Variable(appearance.data)
         appearance = appearance.cuda()
-        appearance_t = time.time()-appearance_t
 
-        vism = time.time()
         mask_pred, h_next = vismem(appearance, mask_pred, h_next)
-        vism = time.time()-vism
+        mask_pred = rescale(mask_pred)
 
-        loss_t = time.time()
-        if s == 0:
+        if s == 1:
             loss = loss_calc(mask_pred, targets[s], args.cuda_vismem)
         else:
             loss = loss + loss_calc(mask_pred, targets[s], args.cuda_vismem)
-        loss_t = time.time()-loss_t
-        appearance_tt = appearance_tt + appearance_t
-        vism_t = vism_t + vism
-        loss_tt = loss_tt + loss_t
-        cuda_tt = cuda_tt + cuda_t
 
-    #dot = make_dot(mask_pred)
-    #dot.render("data/graphs/{}.gv".format(i), view=True)
-    overall = time.time()-overall
+
     lr_ = lr_poly(base_lr,float(i),float(args.iters),0.9)
-    rest = overall - appearance_tt - vism_t - loss_tt - data_read - opt_zero - cuda_t
-    print("{} Iter: {} Loss: {:.4f}, lr {:.4f}, overall {:.4f}, appearance {:.4f}, vism {:.4f}, loss {:.4f}, opt_zero {:.4f}, data load {:.4f}, rest {:.4f}, cuda {:.4f}".format(datetime.now(), i, loss.data[0], lr_, overall, appearance_tt,
-                                        vism_t, loss_tt, opt_zero, data_read, rest, cuda_tt ))
-    loss = loss/args.timesteps
+    overall_t = time.time() - overall_t
+    last_ten.append(loss.data[0])
+    if len(last_ten)>10: last_ten.pop(0)
+    loss = loss
     loss.backward()
     optimizer.step()
+
+    print("{} Iter: {} Loss: {:.4f}, lr {:.4f}, overall {:.4f}, aveloss: {:.4f}".format(datetime.now(), i, loss.data[0], lr_, overall_t, sum(last_ten)/len(last_ten) ))
     if i % 1000 == 0:
         param_groups = optimizer.param_groups
         param_groups[0]['lr'] = lr_

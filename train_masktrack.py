@@ -17,7 +17,7 @@ import math
 import time
 import random
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 def loss_calc(out, label, cuda):
     """
     This function returns cross entropy loss for segmentation
@@ -28,14 +28,20 @@ def loss_calc(out, label, cuda):
 
     label = label+127.5
     label[label==255] = 1
+    label[label==127.5] = 2
     label = torch.from_numpy(label).float()
+    class_weight = torch.FloatTensor([torch.sum(label), torch.sum(1-label)])
+    class_weight = class_weight/torch.sum(class_weight)
+
     label = Variable(label)
     label = rescale(label).data[:, 0, :, :]
     label = Variable(label.long())
-    if cuda: label = label.cuda()
-    if cuda: out  = out.cuda()
+    if cuda: 
+         label = label.cuda()
+         out  = out.cuda()
+         class_weight = class_weight.cuda()
     m = nn.LogSoftmax()
-    criterion = nn.NLLLoss2d()
+    criterion = nn.NLLLoss2d(ignore_index=2)
     #criterion = nn.BCELoss()
 
     out = m(out)
@@ -89,13 +95,15 @@ parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=
                     help='Number of iterations to train')
 parser.add_argument('--save_step', metavar='savestep', type=int, nargs=1, default=5000,
                     help='Number of iterations between saves')
-parser.add_argument('--cuda', metavar='cuda', type=bool, nargs=1, default=False,
+parser.add_argument('--cuda', metavar='cuda', type=bool, nargs=1, default=True,
                     help='True if model should be run on cuda cores')
 parser.add_argument('--DAVIS_base', metavar='DAVIS_base', type=str, nargs=1, default="data/DAVIS",
                     help='Location of DAVIS')
 parser.add_argument('--image_set', metavar='image_set', type=str, nargs=1, default="data/DAVIS/ImageSets/480p/train.txt",
                     help='Location of the list of training pairs')
-parser.add_argument('--batch_size', metavar='batch_size', type=str, nargs=1, default=6,
+parser.add_argument('--batch_size', metavar='batch_size', type=str, nargs=1, default=5,
+                    help='batch size for training')
+parser.add_argument('--optimizer_step', metavar='optimizer_step', type=str, nargs=1, default=2,
                     help='batch size for training')
 args = parser.parse_args()
 display_step = 10
@@ -121,33 +129,32 @@ for k in pretrained_dict.keys():
 pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
 model_dict.update(pretrained_dict)
 
-deep_lab.load_state_dict(torch.load("data/models/masktrack_v22/masktrack_15000.pth"))
-
+#deep_lab.load_state_dict(torch.load("data/models/masktrack_balance/masktrack_10000.pth"))
+deep_lab.load_state_dict(model_dict)
 if args.cuda: deep_lab.cuda()
 
 database = Database(args.DAVIS_base, args.image_set)
 base_lr = 1e-3
-lr_ = base_lr
+lr_ = base_lr #lr_poly(base_lr,float(10001),float(args.iters),0.9)
 weight_decay = 0.0005
-optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': base_lr },
-                        {'params': get_10x_lr_params(deep_lab), 'lr': base_lr*10} ],
+optimizer = optim.SGD([{'params': get_1x_lr_params_NOscale(deep_lab), 'lr': lr_ },
+                        {'params': get_10x_lr_params(deep_lab), 'lr': lr_*10} ],
                         lr = base_lr, momentum = 0.9,weight_decay = weight_decay)
 optimizer.zero_grad()
 last_ten = []
-for i in range(15010, args.iters+1):
+for i in range(0, args.iters+1):
     overall_t = time.time()
     sources, targets = database.get_next_masktrack(args.batch_size)
     rescale = nn.UpsamplingBilinear2d(size = ( sources.shape[2], sources.shape[3])).cuda()
     rescale2 = nn.UpsamplingBilinear2d(size = ( 321, 321)).cuda()
 
     sources = Variable(torch.from_numpy(sources).float())
-    sources = rescale2(sources)
     if args.cuda: sources = sources.cuda()
     out = deep_lab(sources)
     loss = loss_calc(out[0], targets, args.cuda)
     for j in range(1, len(out)):
         loss = loss + loss_calc(out[j], targets, args.cuda)
-    loss = loss/args.batch_size
+    loss = loss/args.optimizer_step
     loss.backward()
     overall_t = time.time() - overall_t
 
@@ -155,7 +162,7 @@ for i in range(15010, args.iters+1):
     if len(last_ten)>10: last_ten.pop(0)
     print("{} Iter: {} Loss: {:.4f}, ave_loss {:0.4f}, lr {:.7f}, time {:0.4f}".format(datetime.now(), i, loss.data[0], sum(last_ten)/len(last_ten), lr_, overall_t))
 
-    if i % 1 == 0:
+    if i % args.optimizer_step == 0:
        optimizer.step()
        lr_ = lr_poly(base_lr,float(i),float(args.iters),0.9)
        param_groups = optimizer.param_groups
@@ -164,4 +171,4 @@ for i in range(15010, args.iters+1):
        optimizer.zero_grad()
 
     if i % args.save_step == 0:
-        torch.save(deep_lab.state_dict(),'data/models/masktrack_v22/masktrack_'+str(i)+'.pth')
+        torch.save(deep_lab.state_dict(),'data/models/masktrack_mix2/masktrack_'+str(i)+'.pth')
