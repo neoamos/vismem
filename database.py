@@ -88,10 +88,10 @@ class Database(object):
                     images[-1] = np.pad(images[-1], ((0,0), (0,0), (0, crop-shape[2]), (0, crop-shape[3])), 'constant')
                     labels[-1] = np.pad(labels[-1], ((0,0), (0,0), (0, crop-shape[2]), (0, crop-shape[3])), 'constant')
 
-                # plt.imshow(images[-1][0].transpose(1,2,0))
-                # plt.show()
-                # plt.imshow(labels[-1][0][0]+127.5)
-                # plt.show()
+                #plt.imshow((images[-1][0].transpose(1,2,0)+123)/270)
+                #plt.show()
+                #plt.imshow(labels[-1][0][0]+127.5)
+                #plt.show()
 
 
         return images, labels
@@ -103,13 +103,10 @@ class Database(object):
         img.load()
         img_size = tuple([int(img.size[0] * scale), int(img.size[1] * scale)])
         img = img.resize(img_size)
-        if flip == 1: img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
         img = np.array(img, dtype=np.float32)
 
         img = np.flip(img, 2).copy()
-        #plt.imshow(img/255)
-        #plt.show()
         img[:,:,0] = img[:,:,0] - 104.008
         img[:,:,1] = img[:,:,1] - 116.669
         img[:,:,2] = img[:,:,2] - 122.675
