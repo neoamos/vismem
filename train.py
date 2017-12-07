@@ -44,9 +44,11 @@ def lr_poly(base_lr, iter,max_iter,power):
 parser = argparse.ArgumentParser(description='Train the vismem network')
 parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=2,
                     help='Number of timesteps (frames) to train RNN on')
-parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=30000,
+parser.add_argument('--iters', metavar='iterations', type=int, nargs=1, default=300000,
                     help='Number of iterations to train')
-parser.add_argument('--save_step', metavar='savestep', type=int, nargs=1, default=100,
+parser.add_argument('--save_step', metavar='savestep', type=int, nargs=1, default=10000,
+                    help='Number of iterations between saves')
+parser.add_argument('--update_step', metavar='update_step', type=int, nargs=1, default=10,
                     help='Number of iterations between saves')
 parser.add_argument('--cuda_vismem', metavar='cuda_vismem', type=bool, nargs=1, default=True,
                     help='True if vismem should be run on cuda cores')
@@ -61,7 +63,7 @@ display_step = 10
 gpu=3
 
 vismem = VisMem(2048,128,128,7,args.cuda_vismem)
-vismem.load_state_dict(torch.load("data/models/mtv/vismem_13000.pth"))
+#vismem.load_state_dict(torch.load("data/models/mtv/vismem_13000.pth"))
 
 if args.cuda_vismem: vismem.cuda()
 
@@ -72,18 +74,21 @@ deep_lab.load_state_dict( torch.load("data/models/masktrack_v22/masktrack_30000.
 if args.cuda_deeplab: deep_lab.cuda()
 
 database = Database(args.DAVIS_base, args.image_set)
-base_lr = 1e-3
+base_lr = 1e-4
+lr_ = base_lr
 optimizer = optim.RMSprop(vismem.parameters(), lr=base_lr, weight_decay=0.005)
 logsoftmax = nn.LogSoftmax()
 last_ten = []
-for i in range(13001, args.iters+1):
-    if i>5000:
-        args.timesteps=14
+optimizer.zero_grad()
+
+for i in range(0, args.iters+1):
+    if i>60000:
+       args.updat_step=1
+       args.timesteps=((i-60000)/1000)+3
     overall = time.time()
     data_read = time.time()
     images, targets = database.get_next(args.timesteps+1)
     data_read = time.time()-data_read
-    optimizer.zero_grad()
     rescale = nn.UpsamplingBilinear2d(size = ( images[0].shape[2], images[0].shape[3] )).cuda()
 
     overall_t = time.time()
@@ -93,7 +98,6 @@ for i in range(13001, args.iters+1):
         if s>1:
            mask_pred = ((math.e**logsoftmax(mask_pred.data))[:, 1:2, :, :]-0.5)*255
            mask_pred = mask_pred.data
-           print(np.amin(mask_pred.cpu().numpy()))
 
         image = torch.cat((torch.from_numpy(images[s]).cuda(), mask_pred), dim=1)
         image = Variable(image, volatile=True).float()
@@ -114,15 +118,18 @@ for i in range(13001, args.iters+1):
             loss = loss + loss_calc(mask_pred, targets[s], args.cuda_vismem)
 
 
-    lr_ = lr_poly(base_lr,float(i),float(args.iters),0.9)
-    overall_t = time.time() - overall_t
     last_ten.append(loss.data[0])
     if len(last_ten)>10: last_ten.pop(0)
-    loss = loss
-    loss.backward()
-    optimizer.step()
+    overall_t = time.time() - overall_t
+    
+    print("{} Iter: {} Loss: {:.4f}, lr {:.4f}, overall {:.4f}, aveloss: {:.4f}, timesteps: {}".format(datetime.now(), i, loss.data[0], lr_, overall_t, sum(last_ten)/len(last_ten), args.timesteps ))
+    if i % args.update_step == 0:
+       loss=loss/args.update_step
+       lr_ = lr_poly(base_lr,float(i),float(args.iters),0.9)
+       loss.backward()
+       optimizer.step()
+       optimizer.zero_grad()
 
-    print("{} Iter: {} Loss: {:.4f}, lr {:.4f}, overall {:.4f}, aveloss: {:.4f}".format(datetime.now(), i, loss.data[0], lr_, overall_t, sum(last_ten)/len(last_ten) ))
     if i % 1000 == 0:
         param_groups = optimizer.param_groups
         param_groups[0]['lr'] = lr_
@@ -134,4 +141,4 @@ for i in range(13001, args.iters+1):
         #    plt.imshow(p[0][1].cpu().numpy(), cmap='gray')
         #    plt.show()
     if i % args.save_step == 0:
-        torch.save(vismem.state_dict(),'data/models/mtv/vismem_'+str(i)+'.pth')
+        torch.save(vismem.state_dict(),'data/models/mtv3/vismem_'+str(i)+'.pth')
