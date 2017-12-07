@@ -22,7 +22,7 @@ class Database(object):
                 seq_num = seq_num+1
                 sequences[seq_num].append(p)
 
-        self.data_aug_scales = [0.5, 0.5, 1, 1.25, 1.5]
+        self.data_aug_scales = [0.5, 1, 1.25, 1.5]
         self.DAVIS_base = DAVIS_base
         self.sequences = sequences
         #random.shuffle(self.sequences)
