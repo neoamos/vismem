@@ -15,11 +15,11 @@ from torch.autograd import Variable
 from PIL import Image
 import matplotlib.pyplot as plt
 import scipy.misc
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 parser = argparse.ArgumentParser(description='Train the vismem network')
 parser.add_argument('--timesteps', metavar='timesteps', type=int, nargs=1, default=3,
                     help='Number of timesteps (frames) to train RNN on')
-parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/masktrack_mix2",
+parser.add_argument('--output_dir', metavar='output_dir', type=str, nargs=1, default="data/DAVIS/Results/Segmentation/480p/mtv4",
                     help='Output dir to save to')
 parser.add_argument('--cuda_vismem', metavar='cuda_vismem', type=bool, nargs=1, default=True,
                     help='True if vismem should be run on cuda cores')
@@ -32,18 +32,18 @@ parser.add_argument('--test_set', metavar='image_set', type=str, nargs=1, defaul
 args = parser.parse_args()
 
 database = Database(args.DAVIS_base, "data/DAVIS/ImageSets/480p/val.txt")
-#vismem = VisMem(2048,128,128,7,args.cuda_vismem)
-#vismem.load_state_dict(torch.load("data/models/mtv/vismem_10000.pth", map_location=lambda storage, loc: storage))
-#if args.cuda_vismem: vismem.cuda()
+vismem = VisMem(2048,128,128,7,args.cuda_vismem)
+vismem.load_state_dict(torch.load("data/models/mtv3/vismem_75000.pth", map_location=lambda storage, loc: storage))
+if args.cuda_vismem: vismem.cuda()
 
 #deep_lab = Res_Deeplab()
-#deep_lab.load_state_dict( torch.load("data/models/bigmem2/deep_lab_29900.pth"))
 #deep_lab.load_state_dict( torch.load("data/models/MS_DeepLab_resnet_pretrained_COCO_init.pth"))
 #if args.cuda_deeplab: deep_lab.cuda()
 logsoftmax = nn.LogSoftmax()
 
 deep_lab = Deeplab_Masktrack()
-deep_lab.load_state_dict(torch.load("data/models/masktrack_mix2/masktrack_10000.pth"))
+deep_lab.load_state_dict( torch.load("data/models/masktrack_v22/masktrack_30000.pth"))
+#deep_lab.load_state_dict(torch.load("data/models/masktrack_mix2/masktrack_10000.pth"))
 if args.cuda_deeplab: deep_lab.cuda()
 
 
@@ -121,7 +121,7 @@ while database.has_next():
     images, targets, name = database.get_test()
     print(name)
     #preds = vismem_pass(images, targets[0])
-    preds = masktrack_pass(images, targets[0])
+    preds = masktrack_vismem_pass(images, targets[0])
     for idx, p in enumerate(preds):
         p = p[0][0].cpu().numpy()
         m = np.zeros(p.shape)

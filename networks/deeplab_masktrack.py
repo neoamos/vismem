@@ -180,7 +180,7 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         #x = f.tanh(self.layer5(x))
-        x = self.layer5(x)
+        #x = self.layer5(x)
 
         return x
 
